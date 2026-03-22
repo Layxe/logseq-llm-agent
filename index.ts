@@ -7,7 +7,7 @@ import { LLMHandler } from './src/LLMHandler';
 // Functions
 // #################################################################################################
 
-function main () {
+async function main () {
     console.log("[Logseq LLM Agent] Plugin initialized.")
 
     PluginSettings.getInstance()

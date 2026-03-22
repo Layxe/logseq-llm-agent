@@ -76,9 +76,21 @@ export class LogseqUtil {
 
             const indent = this.countIndent(rawLine);
             const trimmed = rawLine.trim();
-
-            // Detect unordered list (-, *, +)
+            // const propertyMatch = /^[a-zA-Z0-9_.-]+::\s*.*$/.exec(trimmed);
+            // const tableMatch = /^\|.*\|.*\|.*$/.exec(trimmed);
             const listMatch = /^[-*+]\s+(.*)$/.exec(trimmed);
+            const headingMatch = /^#{1,6}\s+(.*)$/.exec(trimmed);
+
+            console.log(rawLine)
+
+            if (!listMatch && !headingMatch) {
+                const previousNode = stack[stack.length - 1]?.node;
+
+                if (previousNode && previousNode !== root) {
+                    previousNode.content += `\n${trimmed}`;
+                    continue;
+                }
+            }
 
             let content: string;
             let effectiveIndent = indent;

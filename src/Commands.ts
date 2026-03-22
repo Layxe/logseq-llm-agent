@@ -2,6 +2,7 @@ import { ConfigurableComponent } from "./ConfigurableComponent";
 import { LLMHandler } from "./LLMHandler";
 import { LogseqUtil } from "./LogseqUtil";
 import { PluginSettingsEntity } from "./PluginSettings";
+import { SYSTEM_PROMPT } from "./LLMHandler";
 
 export class CommandsHandler extends ConfigurableComponent {
     private promptInputElement: HTMLInputElement | null = null;
@@ -12,6 +13,7 @@ export class CommandsHandler extends ConfigurableComponent {
         "/tags": "Suggest suitable Logseq tags for this content:",
         "/ask": "Answer this clearly and briefly:"
     };
+    private useAgent: boolean = true
 
     constructor() {
         super();
@@ -22,7 +24,7 @@ export class CommandsHandler extends ConfigurableComponent {
     }
 
     showSpinner() {
-        document.getElementById("spinner")!.style.display = "block";
+        document.getElementById("spinner")!.style.display = "inline";
         logseq.showMainUI({ autoFocus: false })
     }
 
@@ -39,6 +41,22 @@ export class CommandsHandler extends ConfigurableComponent {
     hideInput() {
         document.getElementById("backdrop")!.style.display = "none";
         logseq.hideMainUI({restoreEditingCursor: true})
+    }
+
+    toggleUseAgent() {
+        this.useAgent = !this.useAgent;
+        const inputField = document.getElementById("prompt-input");
+        const inputHint = document.getElementById("prompt-hint");
+
+        if (this.useAgent) {
+            inputField!.style.borderColor = "#3498db";
+            inputHint!.textContent = "Agent mode enabled. (Ctrl+Shift+L to toggle)";
+        } else {
+            // use a nice color
+            inputField!.style.borderColor = "#f39c12";
+            inputHint!.textContent = "Agent mode disabled. (Ctrl+Shift+L to toggle)";
+        }
+
     }
 
     private initPromptInput() {
@@ -67,6 +85,11 @@ export class CommandsHandler extends ConfigurableComponent {
         }
 
         this.promptInputElement.addEventListener("keydown", async (event) => {
+            if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === "l") {
+                event.preventDefault();
+                this.toggleUseAgent()
+            }
+
             if (event.key === "Enter") {
                 event.preventDefault();
                 await this.submitPromptInput();
@@ -116,11 +139,9 @@ export class CommandsHandler extends ConfigurableComponent {
         const userPrompt = this.promptInputElement.value.trim();
 
         if (!userPrompt) {
-            logseq.UI.showMsg("Prompt cannot be empty", "warning");
             return;
         }
 
-        this.hideInput();
         this.showSpinner();
 
         try {
@@ -133,9 +154,24 @@ export class CommandsHandler extends ConfigurableComponent {
 
             const blockContent = await LogseqUtil.getBlockAndChildrenContentAsStr(block);
             const expandedPrompt = this.expandPresetPrompt(userPrompt);
-            const fullPrompt = `You are a helpful AI assistant for the Logseq knowledge base. You must only respond in valid markdown format. Do NOT wrap your responses in backticks. Do NOT comment on your responses. Return clear and concise responses.\n\nInstruction:\n${expandedPrompt}\n\nLogseq context:\n${blockContent}`;
-            const msg = await LLMHandler.getInstance().sendMessage(fullPrompt);
-            const response = msg?.response;
+
+            let fullPrompt = `Instruction:\n${expandedPrompt}`
+
+            if (blockContent.length > 2) {
+                console.log("Block content: " + blockContent)
+                fullPrompt += `\n\nLogseq context:\n${blockContent}`
+            }
+
+            let response = null
+
+            if (this.useAgent) {
+                response = await LLMHandler.getInstance().runAgent(fullPrompt);
+                response = response!.content
+            } else {
+                const systemPrompt = LLMHandler.getInstance().systemPrompt
+                response = await LLMHandler.getInstance().sendMessage(fullPrompt, systemPrompt);
+                response = response.response
+            }
 
             if (!response) {
                 logseq.UI.showMsg("Model returned no response", "warning");
@@ -149,15 +185,12 @@ export class CommandsHandler extends ConfigurableComponent {
             this.promptInputElement.value = "";
         } finally {
             this.hideSpinner();
+            this.hideInput();
         }
     }
 
     registerCommands() {
         this.initPromptInput();
-        logseq.Editor.registerSlashCommand("LLM summarize page", async () => {
-
-        })
-
         logseq.Editor.registerSlashCommand("LLM", async () => {
             this.showInput()
 
