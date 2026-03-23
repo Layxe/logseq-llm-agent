@@ -1,6 +1,9 @@
+import "@logseq/libs"
 import axios from "axios";
+import Fuse from "fuse.js";
 import { NodeHtmlMarkdown } from 'node-html-markdown'
 import { LogseqUtil } from "./LogseqUtil";
+import { PageEntity } from "@logseq/libs/dist/LSPlugin";
 
 export type ToolName = 'fetchUrl' | 'getLogseqPageContent' | 'getLogseqBlocksWithReference' | 'getRecentlyEditedPages' | 'getBlockContentByUUID'
 
@@ -12,22 +15,58 @@ type ToolFunctionMap = {
     getBlockContentByUUID: (uuid: string) => Promise<string>
 }
 
+async function getSimilarPageNames(pageName: string, maxResults = 5): Promise<string[]> {
+    const pages = await logseq.Editor.getAllPages() as PageEntity[]
+
+    if (!pages || pages.length === 0) {
+        return []
+    }
+
+    const pageNames = pages
+        .map((page) => page.originalName)
+        .filter((name): name is string => Boolean(name))
+
+    const exactCaseInsensitiveMatch = pageNames.find(
+        (name) => name.toLowerCase() === pageName.toLowerCase()
+    )
+
+    if (exactCaseInsensitiveMatch) {
+        return [exactCaseInsensitiveMatch]
+    }
+
+    const fuse = new Fuse(pageNames, {
+        includeScore: true,
+        threshold: 0.4,
+        ignoreLocation: true,
+    })
+
+    return fuse
+        .search(pageName, { limit: maxResults })
+        .map((result) => result.item)
+}
+
 // Functions
 // #################################################################################################
 
 async function getBlockContentByUUID(uuid: string): Promise<string> {
-    const block = await logseq.Editor.getBlock(uuid)
-    if (!block) {
-        return "[error] Block not found"
+    try {
+        const block = await logseq.Editor.getBlock(uuid)
+
+        if (!block) {
+            return "[error] Block not found"
+        }
+
+        return await LogseqUtil.getBlockAndChildrenContentAsStr(block)
+    } catch (error) {
+        return "[error] Not a valid block UUID"
     }
 
-    return await LogseqUtil.getBlockAndChildrenContentAsStr(block)
 }
 
 
 async function getRecentlyEditedPages(): Promise<string> {
     // Implementation for fetching recently edited pages
-    const pages = await logseq.Editor.getAllPages()
+    const pages = await logseq.Editor.getAllPages() as PageEntity[]
 
     if (!pages) {
         return "[error] Failed to retrieve pages"
@@ -101,6 +140,23 @@ async function getLogseqPageContent(pageName: string) {
     let pageObj = await logseq.Editor.getPage(pageName)
     if (pageObj) {
         let pageBlocks = await logseq.Editor.getPageBlocksTree(pageObj.uuid)
+
+        if (pageBlocks!.length === 0) {
+            // No blocks, check if there is an alias
+            const aliases = pageObj.alias as object[]
+
+            if (!aliases) {
+                return "[warning] Page found but no content"
+            }
+
+            const aliasPageId = aliases[0].id
+
+            pageObj = await logseq.Editor.getPage(aliasPageId)
+            pageBlocks = await logseq.Editor.getPageBlocksTree(pageObj.uuid)
+            console.log(pageObj)
+            console.log(pageBlocks)
+        }
+
         let pageContentMarkdown = ""
 
         if (!pageBlocks) {
@@ -113,7 +169,18 @@ async function getLogseqPageContent(pageName: string) {
 
         return pageContentMarkdown
     } else {
-        return "[error] Page not found"
+        const similarPages = await getSimilarPageNames(pageName)
+
+        if (similarPages.length === 0) {
+            return "[error] Page not found"
+        }
+
+        const suggestedPages = similarPages
+            .map((name) => `[[${name}]]`)
+            .join(", ")
+
+        console.log("Suggested pages:", suggestedPages)
+        return `[error] Page not found. Did you mean: ${suggestedPages}?`
     }
 }
 
