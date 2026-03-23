@@ -129,9 +129,6 @@ export class LogseqUtil {
 
             let newBlock
 
-            // let fetchedBaseBlock = await logseq.Editor.getBlock(baseBlock.uuid)
-            // let baseBlockContentLength = fetchedBaseBlock!.content?.length || 0;
-
             if (baseBlock.content?.length == 0 && previousBlock == baseBlock && root_call) {
                 newBlock = baseBlock
                 await logseq.Editor.updateBlock(newBlock.uuid, block.content)
