@@ -121,7 +121,7 @@ export class LogseqUtil {
         return root.children;
     }
 
-    static async insertBlocks(baseBlock: BlockEntity, blocks: DummyBlockEntity[]) {
+    static async insertBlocks(baseBlock: BlockEntity, blocks: DummyBlockEntity[], root_call: boolean = false) {
 
         let previousBlock = baseBlock;
 
@@ -129,9 +129,15 @@ export class LogseqUtil {
 
             let newBlock
 
-            if (baseBlock.content?.length == 0 && previousBlock == baseBlock) {
+            // let fetchedBaseBlock = await logseq.Editor.getBlock(baseBlock.uuid)
+            // let baseBlockContentLength = fetchedBaseBlock!.content?.length || 0;
+
+            if (baseBlock.content?.length == 0 && previousBlock == baseBlock && root_call) {
                 newBlock = baseBlock
                 await logseq.Editor.updateBlock(newBlock.uuid, block.content)
+                // Wait 100 ms for the update to propagate
+                await new Promise(resolve => setTimeout(resolve, 500));
+                baseBlock = await logseq.Editor.getBlock(baseBlock.uuid)
             } else {
                 newBlock = await logseq.Editor.insertBlock(previousBlock.uuid, block.content, { before: false, sibling: true });
             }

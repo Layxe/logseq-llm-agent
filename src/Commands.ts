@@ -180,7 +180,7 @@ export class CommandsHandler extends ConfigurableComponent {
 
             let parsedResponse = LogseqUtil.parseMarkdownToBlocks(response)
 
-            await LogseqUtil.insertBlocks(block, parsedResponse)
+            await LogseqUtil.insertBlocks(block, parsedResponse, true)
             this.promptInputElement.value = "";
         } finally {
             this.hideSpinner();
