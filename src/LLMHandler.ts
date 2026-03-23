@@ -50,6 +50,8 @@ export class LLMHandler extends ConfigurableComponent {
     model: string = ""
     ollama: Ollama | null = null
     systemPrompt: string = SYSTEM_PROMPT
+    maximumCharacterPageFetching = 8192
+    contextSize = 2048
 
     constructor() {
         super();
@@ -78,6 +80,8 @@ export class LLMHandler extends ConfigurableComponent {
         this.apiBaseUrl = settingsBaseUrl;
         this.apiKey = settings.apiKey;
         this.model = settings.model;
+        this.maximumCharacterPageFetching = settings.maxContentSize;
+        this.contextSize = settings.contextSize;
 
         this.ollama = new Ollama({
             host: this.apiBaseUrl,
@@ -130,13 +134,18 @@ export class LLMHandler extends ConfigurableComponent {
             { role: 'user', content: userInput }
         ]
 
+        const contextSizeInteger = parseInt(String(this.contextSize))
+
         while (true && calls < MAX_CALLS) {
             const response = await this.ollama.chat({
                 model: this.model,
                 messages: messages,
                 tools: logseqTools,
                 think: true,
-                keep_alive: "15m"
+                keep_alive: "15m",
+                options: {
+                    num_ctx: contextSizeInteger
+                }
             })
 
             messages.push(response.message)

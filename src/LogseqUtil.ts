@@ -41,7 +41,6 @@ export class LogseqUtil {
 
             if (type == "uuid") {
                 const childBlock = await logseq.Editor.getBlock(identifier)
-                console.log(childBlock)
                 if (childBlock) {
                     baseContent += "\n  " + await this.getBlockAndChildrenContentAsStr(childBlock, indent + "  ");
                 }

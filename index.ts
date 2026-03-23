@@ -3,6 +3,7 @@ import { PageEntity } from "@logseq/libs/dist/LSPlugin.user";
 import { PluginSettings } from './src/PluginSettings';
 import { CommandsHandler } from './src/Commands';
 import { LLMHandler } from './src/LLMHandler';
+import { getLogseqPageContent } from './src/LLMTools';
 
 // Functions
 // #################################################################################################
@@ -17,6 +18,9 @@ async function main () {
 
     PluginSettings.registerConfigurableComponent(commandsHandler)
     PluginSettings.registerConfigurableComponent(LLMHandler.getInstance())
+
+    let output = await getLogseqPageContent("Meetings/Weekly Oliver")
+    console.log("Output:", output)
 }
 
 function createModel() {

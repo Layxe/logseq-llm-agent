@@ -4,7 +4,9 @@ import { ConfigurableComponent } from "./ConfigurableComponent"
 export interface PluginSettingsEntity {
     apiBaseUrl: string,
     apiKey: string,
-    model: string
+    model: string,
+    maxContentSize: number,
+    contextSize: number
 }
 
 export const settingsConfig: SettingSchemaDesc[] = [
@@ -30,6 +32,20 @@ export const settingsConfig: SettingSchemaDesc[] = [
         type: "string",
         default: "gpt-oss:120b"
 
+    },
+    {
+        key: "maxContentSize",
+        title: "Page Maximum Content Size",
+        description: "The maximum number of characters to process when fetching page content",
+        type: "number",
+        default: 32768
+    },
+    {
+        key: "contextSize",
+        title: "Context Size",
+        description: "The size of the context window for the LLM",
+        type: "number",
+        default: 8192
     }
 ]
 

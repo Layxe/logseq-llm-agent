@@ -4,6 +4,7 @@ import Fuse from "fuse.js";
 import { NodeHtmlMarkdown } from 'node-html-markdown'
 import { LogseqUtil } from "./LogseqUtil";
 import { PageEntity } from "@logseq/libs/dist/LSPlugin";
+import { LLMHandler } from "./LLMHandler";
 
 export type ToolName = 'fetchUrl' | 'getLogseqPageContent' | 'getLogseqBlocksWithReference' | 'getRecentlyEditedPages' | 'getBlockContentByUUID'
 
@@ -128,9 +129,7 @@ async function getLogseqBlocksWithReference(pageReference: string): Promise<stri
     return JSON.stringify(searchResults)
 }
 
-async function getLogseqPageContent(pageName: string) {
-
-    console.log("Calling tool with page name:", pageName)
+export async function getLogseqPageContent(pageName: string) {
 
     // Remove [[ ... ]] if present
     if (pageName.startsWith("[[") && pageName.endsWith("]]")) {
@@ -153,8 +152,6 @@ async function getLogseqPageContent(pageName: string) {
 
             pageObj = await logseq.Editor.getPage(aliasPageId)
             pageBlocks = await logseq.Editor.getPageBlocksTree(pageObj.uuid)
-            console.log(pageObj)
-            console.log(pageBlocks)
         }
 
         let pageContentMarkdown = ""
@@ -164,7 +161,21 @@ async function getLogseqPageContent(pageName: string) {
         }
 
         for (const block of pageBlocks) {
-            pageContentMarkdown += await LogseqUtil.getBlockAndChildrenContentAsStr(block) + "\n"
+            // The PageBlocksTree only returns a list without the connected children
+            // so we need to fetch the actual block.
+            const actualBlock = await logseq.Editor.getBlock(block.uuid)
+
+            if (!actualBlock) {
+                continue;
+            }
+
+            pageContentMarkdown += await LogseqUtil.getBlockAndChildrenContentAsStr(actualBlock) + "\n"
+        }
+
+        const maxCharsPageFetch = LLMHandler.getInstance().maximumCharacterPageFetching
+
+        if (pageContentMarkdown.length > maxCharsPageFetch) {
+            pageContentMarkdown = pageContentMarkdown.substring(0, maxCharsPageFetch)
         }
 
         return pageContentMarkdown
