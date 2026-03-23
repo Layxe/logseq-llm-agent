@@ -5,6 +5,8 @@ import { NodeHtmlMarkdown } from 'node-html-markdown'
 import { LogseqUtil } from "./LogseqUtil";
 import { PageEntity } from "@logseq/libs/dist/LSPlugin";
 import { LLMHandler } from "./LLMHandler";
+import { PDFParse } from "pdf-parse";
+import "pdfjs-dist/build/pdf.worker.mjs"
 
 export type ToolName = 'fetchUrl' | 'getLogseqPageContent' | 'getLogseqBlocksWithReference' | 'getRecentlyEditedPages' | 'getBlockContentByUUID'
 
@@ -197,9 +199,28 @@ export async function getLogseqPageContent(pageName: string) {
 
 async function fetchUrl(url: string): Promise<string> {
     try {
-        const response = await axios.get(url);
-        const markdownResponse = NodeHtmlMarkdown.translate(response.data);
+        const response = await axios.get(url, {
+            responseType: "arraybuffer" // important for PDFs
+        });
+
+        const contentType = response.headers["content-type"];
+
+        // Handle PDF
+        if (contentType?.includes("application/pdf") || url.toLowerCase().endsWith(".pdf")) {
+            const parser = new PDFParse({
+                data: response.data,
+                useWorkerFetch: false,
+                worker: undefined
+            });
+            const output = await parser.getText({ });
+            return output.text || "[empty pdf]";
+        }
+
+        // Handle HTML
+        const html = response.data.toString("utf-8");
+        const markdownResponse = NodeHtmlMarkdown.translate(html);
         return markdownResponse;
+
     } catch (error) {
         console.error("Error fetching URL:", error);
         return "[error] Failed to fetch URL";
