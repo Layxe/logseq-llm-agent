@@ -2,24 +2,46 @@ import { ConfigurableComponent } from "./ConfigurableComponent";
 import { LLMHandler } from "./LLMHandler";
 import { LogseqUtil } from "./LogseqUtil";
 import { PluginSettingsEntity } from "./PluginSettings";
-import { SYSTEM_PROMPT } from "./LLMHandler";
 
-export class CommandsHandler extends ConfigurableComponent {
+export class UserInterface extends ConfigurableComponent {
     private promptInputElement: HTMLInputElement | null = null;
-    private readonly presetPromptMap: Record<string, string> = {
-        "/sum": "Summarize this in concise bullet points:",
-        "/rewrite": "Rewrite this to be clearer and more concise:",
-        "/action": "Extract action items from this:",
-        "/tags": "Suggest suitable Logseq tags for this content:",
-        "/ask": "Answer this clearly and briefly:"
+    private presetPromptMap: Record<string, string> = {
+        "/sum": "Summarize this in concise bullet points",
+        "/rewrite": "Rewrite this to be clearer and more concise",
+        "/todos": "Generate TODO items from this",
+        "/tags": "Suggest suitable Logseq tags for this content",
+        "/md": "Create a markdown version of this"
     };
     private useAgent: boolean = true
+    private awesomeplete: any;
+    private static _instance: UserInterface
 
     constructor() {
         super();
     }
 
+    static getInstance(): UserInterface {
+        if (!UserInterface._instance) {
+            UserInterface._instance = new UserInterface();
+        }
+        return UserInterface._instance;
+    }
+
+
     configure(settings: PluginSettingsEntity): void {
+
+    }
+
+    addCustomPresetPrompt(command: string, prompt: string) {
+        this.presetPromptMap[command] = prompt;
+        this.updateAwesomeplete()
+    }
+
+    updateAwesomeplete() {
+        console.log(this.presetPromptMap)
+        if (this.awesomeplete) {
+            this.awesomeplete.list = Object.keys(this.presetPromptMap);
+        }
 
     }
 
@@ -76,7 +98,7 @@ export class CommandsHandler extends ConfigurableComponent {
         const AwesompleteCtor = (window as any).Awesomplete;
 
         if (AwesompleteCtor) {
-            new AwesompleteCtor(this.promptInputElement, {
+            this.awesomeplete = new AwesompleteCtor(this.promptInputElement, {
                 list: presetCommands,
                 minChars: 1,
                 maxItems: 8,
@@ -158,9 +180,10 @@ export class CommandsHandler extends ConfigurableComponent {
             let fullPrompt = `Instruction:\n${expandedPrompt}`
 
             if (blockContent.length > 2) {
-                console.log("Block content: " + blockContent)
                 fullPrompt += `\n\nLogseq context:\n${blockContent}`
             }
+
+            console.log("Full prompt:\n", fullPrompt)
 
             let response = null
 

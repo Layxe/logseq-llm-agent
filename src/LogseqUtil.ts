@@ -6,15 +6,6 @@ type DummyBlockEntity = {
 };
 
 export class LogseqUtil {
-    private static isBlockEntity(value: unknown): value is BlockEntity {
-        if (!value || typeof value !== "object") {
-            return false;
-        }
-
-        const maybeBlock = value as Partial<BlockEntity>;
-        return typeof maybeBlock.content === "string" && Array.isArray(maybeBlock.children);
-    }
-
     static async getBlockAndChildrenContentAsStr(block: BlockEntity, indent: string = "") {
 
         if (block === undefined) {
@@ -79,8 +70,6 @@ export class LogseqUtil {
             // const tableMatch = /^\|.*\|.*\|.*$/.exec(trimmed);
             const listMatch = /^[-*+]\s+(.*)$/.exec(trimmed);
             const headingMatch = /^#{1,6}\s+(.*)$/.exec(trimmed);
-
-            console.log(rawLine)
 
             if (!listMatch && !headingMatch) {
                 const previousNode = stack[stack.length - 1]?.node;

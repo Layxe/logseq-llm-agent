@@ -4,6 +4,8 @@ import { ConfigurableComponent } from "./ConfigurableComponent";
 import axios from "axios";
 import { ToolName, logseqAvailableFunctions, logseqTools } from "./LLMTools";
 import { PluginSettingsEntity } from "./PluginSettings";
+import { UserInterface } from "./UserInterface";
+import { BlockEntity } from "@logseq/libs/dist/LSPlugin.user";
 
 const LLM_SETTINGS_PAGE = ".llm"
 export const SYSTEM_PROMPT =
@@ -100,13 +102,45 @@ export class LLMHandler extends ConfigurableComponent {
 
             const pageBlocks = await logseq.Editor.getPageBlocksTree(page.uuid)
 
+            let systemPromptFound = false
+            // Commands have the shape: Command: `<cmd name>`
+            const customCommandDeclarationRegex = /^Command: `(.+)`$/
+
             for (const block of pageBlocks!) {
                 const blockContent = block.content
 
-                if (blockContent?.startsWith("```")) {
+                if (blockContent?.startsWith("```") && !systemPromptFound) {
                     const newPrompt = blockContent.replaceAll("```", "")
                     llmHandlerInstance.systemPrompt = newPrompt
-                    return
+                    systemPromptFound = true
+                }
+
+                const customCommandMatch = blockContent?.match(customCommandDeclarationRegex)
+                if (customCommandMatch) {
+                    const [, command] = customCommandMatch
+                    const blockObj = await logseq.Editor.getBlock(block.uuid)
+
+                    if (!blockObj) {
+                        continue
+                    }
+
+                    let child = blockObj.children?.[0] as BlockEntity
+
+                    if (child) {
+                        const child_uuid = child[1] as string
+                        const childBlock = await logseq.Editor.getBlock(child_uuid)
+                        let childContent = childBlock?.content
+
+                        if (childContent) {
+
+                            // remove ``` from the start and end of the content
+                            childContent = childContent.replace(/^```/, "").replace(/```$/, "")
+
+                            console.log(`Found custom prompt for command '${command}': ${childContent}`)
+
+                            UserInterface.getInstance().addCustomPresetPrompt(command, childContent)
+                        }
+                    }
                 }
             }
         }, 2000)
