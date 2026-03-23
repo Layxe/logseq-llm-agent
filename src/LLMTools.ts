@@ -200,7 +200,7 @@ export async function getLogseqPageContent(pageName: string) {
 async function fetchUrl(url: string): Promise<string> {
     try {
         const response = await axios.get(url, {
-            responseType: "arraybuffer" // important for PDFs
+            responseType: "arraybuffer"
         });
 
         const contentType = response.headers["content-type"];
@@ -217,8 +217,11 @@ async function fetchUrl(url: string): Promise<string> {
         }
 
         // Handle HTML
-        const html = response.data.toString("utf-8");
-        const markdownResponse = NodeHtmlMarkdown.translate(html);
+        // const html = response.data.toString("utf-8");
+        const responseData = response.data as ArrayBuffer
+        const decoder = new TextDecoder("utf-8")
+        const text = decoder.decode(responseData)
+        const markdownResponse = NodeHtmlMarkdown.translate(text);
         return markdownResponse;
 
     } catch (error) {
