@@ -136,6 +136,12 @@ export class LLMHandler extends ConfigurableComponent {
 
         const contextSizeInteger = parseInt(String(this.contextSize))
 
+        const options: any = {}
+
+        if (contextSizeInteger > 0) {
+            options.num_ctx = contextSizeInteger
+        }
+
         while (true && calls < MAX_CALLS) {
             const response = await this.ollama.chat({
                 model: this.model,
@@ -143,9 +149,7 @@ export class LLMHandler extends ConfigurableComponent {
                 tools: logseqTools,
                 think: true,
                 keep_alive: "15m",
-                options: {
-                    num_ctx: contextSizeInteger
-                }
+                options: options
             })
 
             messages.push(response.message)

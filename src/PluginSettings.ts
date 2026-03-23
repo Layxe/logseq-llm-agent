@@ -36,16 +36,16 @@ export const settingsConfig: SettingSchemaDesc[] = [
     {
         key: "maxContentSize",
         title: "Page Maximum Content Size",
-        description: "The maximum number of characters to process when fetching page content",
+        description: "The maximum number of characters to process when fetching page content. Set to -1 for no limit.",
         type: "number",
-        default: 32768
+        default: -1
     },
     {
         key: "contextSize",
         title: "Context Size",
-        description: "The size of the context window for the LLM",
+        description: "The size of the context window for the LLM. Set to -1 to inherit the default value from OLLAMA.",
         type: "number",
-        default: 8192
+        default: -1
     }
 ]
 

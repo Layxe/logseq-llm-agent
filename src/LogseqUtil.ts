@@ -126,7 +126,16 @@ export class LogseqUtil {
         let previousBlock = baseBlock;
 
         for (const block of blocks) {
-            let newBlock = await logseq.Editor.insertBlock(previousBlock.uuid, block.content, { before: false, sibling: true });
+
+            let newBlock
+
+            if (baseBlock.content?.length == 0 && previousBlock == baseBlock) {
+                newBlock = baseBlock
+                await logseq.Editor.updateBlock(newBlock.uuid, block.content)
+            } else {
+                newBlock = await logseq.Editor.insertBlock(previousBlock.uuid, block.content, { before: false, sibling: true });
+            }
+
             // Try to insert first children and then add others as siblings
             if (block.children.length > 0) {
                 let firstChild = block.children[0];

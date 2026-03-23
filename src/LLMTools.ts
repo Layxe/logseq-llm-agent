@@ -174,7 +174,7 @@ export async function getLogseqPageContent(pageName: string) {
 
         const maxCharsPageFetch = LLMHandler.getInstance().maximumCharacterPageFetching
 
-        if (pageContentMarkdown.length > maxCharsPageFetch) {
+        if (maxCharsPageFetch > 0 && pageContentMarkdown.length > maxCharsPageFetch) {
             pageContentMarkdown = pageContentMarkdown.substring(0, maxCharsPageFetch)
         }
 

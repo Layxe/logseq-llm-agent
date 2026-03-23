@@ -179,7 +179,6 @@ export class CommandsHandler extends ConfigurableComponent {
             }
 
             let parsedResponse = LogseqUtil.parseMarkdownToBlocks(response)
-            console.log(parsedResponse)
 
             await LogseqUtil.insertBlocks(block, parsedResponse)
             this.promptInputElement.value = "";
