@@ -7,6 +7,8 @@ import { PageEntity } from "@logseq/libs/dist/LSPlugin";
 import { LLMHandler } from "./LLMHandler";
 import { PDFParse } from "pdf-parse";
 import "pdfjs-dist/build/pdf.worker.mjs"
+import { Readability } from "@mozilla/readability";
+import { parseHTML } from "linkedom"
 
 export type ToolName = 'fetchUrl' | 'getLogseqPageContent' | 'getLogseqBlocksWithReference' | 'getRecentlyEditedPages' | 'getBlockContentByUUID' | 'searchWeb'
 
@@ -304,9 +306,21 @@ async function fetchUrl(url: string): Promise<string> {
         const responseData = response.data as ArrayBuffer
         const decoder = new TextDecoder("utf-8")
         const text = decoder.decode(responseData)
-        const markdownResponse = NodeHtmlMarkdown.translate(text);
-        return markdownResponse;
 
+        const {document} = parseHTML(text);
+        const junk = ["script", "style", "noscript", "iframe", "header", "footer", "nav", "aside", ".ads", ".advertisement", ".cookie", ".banner", ".popup", ".modal"]
+
+        junk.forEach(selector => {
+            document.querySelectorAll(selector).forEach(el => el.remove());
+        })
+        const reader = new Readability(document)
+        const article = reader.parse()
+
+        if (!article ||!article.content) {
+            return NodeHtmlMarkdown.translate(text)
+        } else {
+            return NodeHtmlMarkdown.translate(article.content)
+        }
     } catch (error) {
         console.error("Error fetching URL:", error);
         return "[error] Failed to fetch URL";

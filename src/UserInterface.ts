@@ -15,6 +15,7 @@ export class UserInterface extends ConfigurableComponent {
     private useAgent: boolean = true
     private awesomeplete: any;
     private static _instance: UserInterface
+    private currentBlock
 
     constructor() {
         super();
@@ -114,7 +115,7 @@ export class UserInterface extends ConfigurableComponent {
 
             if (event.key === "Enter") {
                 event.preventDefault();
-                await this.submitPromptInput();
+                await this.submitPromptInput(event);
             }
 
             if (event.key === "Escape") {
@@ -153,12 +154,13 @@ export class UserInterface extends ConfigurableComponent {
         return remainingText ? `${presetPrefix} ${remainingText}` : presetPrefix;
     }
 
-    private async submitPromptInput() {
+    private async submitPromptInput(event: KeyboardEvent) {
         if (!this.promptInputElement) {
             return;
         }
 
         const userPrompt = this.promptInputElement.value.trim();
+        let replaceInsteadOfInsert = event.ctrlKey || event.shiftKey
 
         if (!userPrompt) {
             return;
@@ -173,6 +175,8 @@ export class UserInterface extends ConfigurableComponent {
                 logseq.UI.showMsg("No block selected", "warning");
                 return;
             }
+
+            this.currentBlock = block
 
             const blockContent = await LogseqUtil.getBlockAndChildrenContentAsStr(block);
             const expandedPrompt = this.expandPresetPrompt(userPrompt);
@@ -203,7 +207,11 @@ export class UserInterface extends ConfigurableComponent {
 
             let parsedResponse = LogseqUtil.parseMarkdownToBlocks(response)
 
-            await LogseqUtil.insertBlocks(block, parsedResponse, true)
+            if (replaceInsteadOfInsert) {
+                await LogseqUtil.replaceBlocks(this.currentBlock, parsedResponse);
+            } else {
+                await LogseqUtil.insertBlocks(this.currentBlock, parsedResponse, true);
+            }
             this.promptInputElement.value = "";
         } finally {
             this.hideSpinner();

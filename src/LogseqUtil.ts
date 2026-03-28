@@ -6,6 +6,18 @@ type DummyBlockEntity = {
 };
 
 export class LogseqUtil {
+    private static async insertBlockTree(parentUuid: string, block: DummyBlockEntity): Promise<void> {
+        const inserted = await logseq.Editor.insertBlock(parentUuid, block.content, { before: false, sibling: false });
+
+        if (!inserted || !block.children?.length) {
+            return;
+        }
+
+        for (const child of block.children) {
+            await this.insertBlockTree(inserted.uuid, child);
+        }
+    }
+
     static async getBlockAndChildrenContentAsStr(block: BlockEntity, indent: string = "") {
 
         if (block === undefined) {
@@ -108,6 +120,32 @@ export class LogseqUtil {
         }
 
         return root.children;
+    }
+
+    static async replaceBlocks(baseBlock: BlockEntity, blocks: DummyBlockEntity[]) {
+
+        if (!blocks.length) {
+            return;
+        }
+
+        // Replace the content of the base block
+        await logseq.Editor.updateBlock(baseBlock.uuid, blocks[0].content);
+
+        // Remove any existing children
+        for (const child of baseBlock.children || []) {
+            await logseq.Editor.removeBlock(child[1])
+        }
+
+        // Insert descendants of the first block
+        for (const child of blocks[0].children || []) {
+            await this.insertBlockTree(baseBlock.uuid, child);
+        }
+
+        // Insert remaining top-level blocks as children (including their descendants)
+        for (const block of blocks.slice(1)) {
+            await this.insertBlockTree(baseBlock.uuid, block);
+        }
+
     }
 
     static async insertBlocks(baseBlock: BlockEntity, blocks: DummyBlockEntity[], root_call: boolean = false) {
