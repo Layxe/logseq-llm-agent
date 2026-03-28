@@ -6,7 +6,8 @@ export interface PluginSettingsEntity {
     apiKey: string,
     model: string,
     maxContentSize: number,
-    contextSize: number
+    contextSize: number,
+    searxngUrl: string
 }
 
 export const settingsConfig: SettingSchemaDesc[] = [
@@ -32,6 +33,13 @@ export const settingsConfig: SettingSchemaDesc[] = [
         type: "string",
         default: "gpt-oss:120b"
 
+    },
+    {
+        key: "searxngUrl",
+        title: "SearXNG URL",
+        description: "The URL for the SearXNG search instance",
+        type: "string",
+        default: ""
     },
     {
         key: "maxContentSize",

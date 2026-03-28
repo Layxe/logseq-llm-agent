@@ -8,7 +8,7 @@ import { LLMHandler } from "./LLMHandler";
 import { PDFParse } from "pdf-parse";
 import "pdfjs-dist/build/pdf.worker.mjs"
 
-export type ToolName = 'fetchUrl' | 'getLogseqPageContent' | 'getLogseqBlocksWithReference' | 'getRecentlyEditedPages' | 'getBlockContentByUUID'
+export type ToolName = 'fetchUrl' | 'getLogseqPageContent' | 'getLogseqBlocksWithReference' | 'getRecentlyEditedPages' | 'getBlockContentByUUID' | 'searchWeb'
 
 type ToolFunctionMap = {
     fetchUrl: (url: string) => Promise<string>
@@ -16,6 +16,7 @@ type ToolFunctionMap = {
     getLogseqBlocksWithReference: (pageReference: string) => Promise<string>
     getRecentlyEditedPages: () => Promise<string>
     getBlockContentByUUID: (uuid: string) => Promise<string>
+    searchWeb: (query: string) => Promise<string>
 }
 
 async function getSimilarPageNames(pageName: string, maxResults = 5): Promise<string[]> {
@@ -197,6 +198,88 @@ export async function getLogseqPageContent(pageName: string) {
     }
 }
 
+type SearchResult = {
+    title: string;
+    url: string;
+    snippet: string;
+    source?: string;
+    content?: string;
+};
+
+async function searchWeb(
+    query: string,
+): Promise<string> {
+    const limit = 5
+
+    const searxngURL = LLMHandler.getInstance().getSearxngURL()
+
+    if (searxngURL.length === 0) {
+        console.warn("SearXNG URL is not configured.");
+        return "[error] SearXNG URL is not configured. ABORT ANY FURTHER WEB SEARCH"
+    }
+
+    try {
+        // 1. Search via SearXNG
+        const response = await axios.get(
+            searxngURL,
+            {
+                params: {
+                    q: query,
+                    format: "json",
+                    language: "en",
+                    safesearch: 0
+                }
+            }
+        );
+
+        let results: SearchResult[] = (response.data.results || []).map((r: any) => ({
+            title: r.title,
+            url: r.url,
+            snippet: r.content || "",
+            source: r.engine
+        }));
+
+        results = results.filter(r => r.url && r.title);
+
+        const seenDomains = new Set<string>();
+        results = results.filter(r => {
+            try {
+                const domain = new URL(r.url).hostname;
+                if (seenDomains.has(domain)) return false;
+                seenDomains.add(domain);
+                return true;
+            } catch {
+                return false;
+            }
+        });
+
+        function score(r: SearchResult): number {
+            let s = 0;
+            if (r.url.endsWith(".pdf")) s += 2;
+            if (r.source === "google") s += 1;
+            if (r.snippet.length > 120) s += 1;
+            return s;
+        }
+
+        results.sort((a, b) => score(b) - score(a));
+
+        // 5. Limit results
+        results = results.slice(0, limit);
+
+        // 6. Format results into a string
+        const formattedResults = results.map((r) => {
+            return `Title: ${r.title} URL: ${r.url}\n`;
+        }).join("\n");
+
+        return formattedResults;
+
+
+    } catch (error) {
+        console.error("searchWeb error:", error);
+        return "[error] Failed to search web";
+    }
+}
+
 async function fetchUrl(url: string): Promise<string> {
     try {
         const response = await axios.get(url, {
@@ -238,7 +321,8 @@ export const logseqAvailableFunctions: ToolFunctionMap = {
   getLogseqPageContent,
   getLogseqBlocksWithReference,
   getRecentlyEditedPages,
-  getBlockContentByUUID
+  getBlockContentByUUID,
+  searchWeb
 }
 
 export const logseqTools = [
@@ -309,5 +393,19 @@ export const logseqTools = [
                 },
             },
         },
-    }
+    },
+    {
+        type: 'function',
+        function: {
+            name: 'searchWeb',
+            description: 'Search the web for information.',
+            parameters: {
+                type: 'object',
+                required: ['query'],
+                properties: {
+                    query: { type: 'string', description: 'The search query' },
+                },
+            },
+        },
+    },
 ]

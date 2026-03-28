@@ -48,6 +48,7 @@ export const SYSTEM_PROMPT =
 export class LLMHandler extends ConfigurableComponent {
     static _instance: LLMHandler
     apiBaseUrl: string = ""
+    searxngUrl: string = ""
     apiKey: string = ""
     model: string = ""
     ollama: Ollama | null = null
@@ -66,8 +67,13 @@ export class LLMHandler extends ConfigurableComponent {
         return LLMHandler._instance;
     }
 
+    getSearxngURL() {
+        return this.searxngUrl;
+    }
+
     configure(settings: PluginSettingsEntity): void {
         let settingsBaseUrl = settings.apiBaseUrl
+        this.searxngUrl = settings.searxngUrl
 
         // Remove unnecessary /api at the end
         if (settingsBaseUrl.endsWith("api/")) {
@@ -79,11 +85,16 @@ export class LLMHandler extends ConfigurableComponent {
             settingsBaseUrl = settingsBaseUrl.slice(0, -1)
         }
 
+        if (settingsBaseUrl.endsWith("/")) {
+            settingsBaseUrl = settingsBaseUrl.slice(0, -1)
+        }
+
         this.apiBaseUrl = settingsBaseUrl;
         this.apiKey = settings.apiKey;
         this.model = settings.model;
         this.maximumCharacterPageFetching = settings.maxContentSize;
         this.contextSize = settings.contextSize;
+        this.searxngUrl = settings.searxngUrl;
 
         this.ollama = new Ollama({
             host: this.apiBaseUrl,
@@ -227,6 +238,11 @@ export class LLMHandler extends ConfigurableComponent {
                     if (toolName === 'getBlockContentByUUID') {
                         const args = call.function.arguments as { uuid: string }
                         result = await fn(args.uuid)
+                    }
+
+                    if (toolName === 'searchWeb') {
+                        const args = call.function.arguments as { query: string }
+                        result = await fn(args.query)
                     }
 
                     messages.push({ role: 'tool', tool_name: toolName, content: String(result) })
