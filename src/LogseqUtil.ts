@@ -6,13 +6,16 @@ type DummyBlockEntity = {
 };
 
 export class LogseqUtil {
-    private static isBlockEntity(value: unknown): value is BlockEntity {
-        if (!value || typeof value !== "object") {
-            return false;
+    private static async insertBlockTree(parentUuid: string, block: DummyBlockEntity): Promise<void> {
+        const inserted = await logseq.Editor.insertBlock(parentUuid, block.content, { before: false, sibling: false });
+
+        if (!inserted || !block.children?.length) {
+            return;
         }
 
-        const maybeBlock = value as Partial<BlockEntity>;
-        return typeof maybeBlock.content === "string" && Array.isArray(maybeBlock.children);
+        for (const child of block.children) {
+            await this.insertBlockTree(inserted.uuid, child);
+        }
     }
 
     static async getBlockAndChildrenContentAsStr(block: BlockEntity, indent: string = "") {
@@ -41,7 +44,6 @@ export class LogseqUtil {
 
             if (type == "uuid") {
                 const childBlock = await logseq.Editor.getBlock(identifier)
-                console.log(childBlock)
                 if (childBlock) {
                     baseContent += "\n  " + await this.getBlockAndChildrenContentAsStr(childBlock, indent + "  ");
                 }
@@ -76,9 +78,19 @@ export class LogseqUtil {
 
             const indent = this.countIndent(rawLine);
             const trimmed = rawLine.trim();
-
-            // Detect unordered list (-, *, +)
+            // const propertyMatch = /^[a-zA-Z0-9_.-]+::\s*.*$/.exec(trimmed);
+            // const tableMatch = /^\|.*\|.*\|.*$/.exec(trimmed);
             const listMatch = /^[-*+]\s+(.*)$/.exec(trimmed);
+            const headingMatch = /^#{1,6}\s+(.*)$/.exec(trimmed);
+
+            if (!listMatch && !headingMatch) {
+                const previousNode = stack[stack.length - 1]?.node;
+
+                if (previousNode && previousNode !== root) {
+                    previousNode.content += `\n${trimmed}`;
+                    continue;
+                }
+            }
 
             let content: string;
             let effectiveIndent = indent;
@@ -110,12 +122,50 @@ export class LogseqUtil {
         return root.children;
     }
 
-    static async insertBlocks(baseBlock: BlockEntity, blocks: DummyBlockEntity[]) {
+    static async replaceBlocks(baseBlock: BlockEntity, blocks: DummyBlockEntity[]) {
+
+        if (!blocks.length) {
+            return;
+        }
+
+        // Replace the content of the base block
+        await logseq.Editor.updateBlock(baseBlock.uuid, blocks[0].content);
+
+        // Remove any existing children
+        for (const child of baseBlock.children || []) {
+            await logseq.Editor.removeBlock(child[1])
+        }
+
+        // Insert descendants of the first block
+        for (const child of blocks[0].children || []) {
+            await this.insertBlockTree(baseBlock.uuid, child);
+        }
+
+        // Insert remaining top-level blocks as children (including their descendants)
+        for (const block of blocks.slice(1)) {
+            await this.insertBlockTree(baseBlock.uuid, block);
+        }
+
+    }
+
+    static async insertBlocks(baseBlock: BlockEntity, blocks: DummyBlockEntity[], root_call: boolean = false) {
 
         let previousBlock = baseBlock;
 
         for (const block of blocks) {
-            let newBlock = await logseq.Editor.insertBlock(previousBlock.uuid, block.content, { before: false, sibling: true });
+
+            let newBlock
+
+            if (baseBlock.content?.length == 0 && previousBlock == baseBlock && root_call) {
+                newBlock = baseBlock
+                await logseq.Editor.updateBlock(newBlock.uuid, block.content)
+                // Wait 100 ms for the update to propagate
+                await new Promise(resolve => setTimeout(resolve, 500));
+                baseBlock = await logseq.Editor.getBlock(baseBlock.uuid)
+            } else {
+                newBlock = await logseq.Editor.insertBlock(previousBlock.uuid, block.content, { before: false, sibling: true });
+            }
+
             // Try to insert first children and then add others as siblings
             if (block.children.length > 0) {
                 let firstChild = block.children[0];
